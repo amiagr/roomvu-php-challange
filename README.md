@@ -4,7 +4,7 @@ This PHP service provides functionality to manage users and transactions. Users 
 
 
 ### Prerequisites
--  `PHP 7.4+`
+-  `PHP 8.0|8.1`
 -  `MySQL Database`
 -  `Docker`
 
