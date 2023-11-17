@@ -10,7 +10,7 @@ This PHP service provides functionality to manage users and transactions. Users 
 
 Clone the repository from:
 ```shell
-git clone https://github.com/yourusername/backend-service-challenge.git
+git clone https://github.com/amiagr/roomvu-php-challange
 ```
 
 Install dependencies:
