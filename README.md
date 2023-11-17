@@ -20,7 +20,7 @@ composer install
 
 Configure database connection:
 ```shell
-Update database connection details in src/Database.php.
+Update database connection details in config.php.
 ```
 
 Run Migrations:
