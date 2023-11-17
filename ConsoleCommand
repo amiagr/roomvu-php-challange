@@ -1,0 +1,139 @@
+#!/usr/bin/env php
+<?php
+
+require_once __DIR__ . '/vendor/autoload.php';
+
+use App\Database;
+use App\Entity\Transaction;
+use App\Entity\User;
+use Migrations\BaseMigration;
+
+use App\Repository\UserRepository;
+use App\Repository\TransactionRepository;
+use App\Service\ReportService;
+
+use Faker\Factory;
+use Faker\Generator;
+
+$command = $argv[1] ?? null;
+$console = new ConsoleCommand(new Database());
+
+switch ($command) {
+    case 'migrate':
+        $console->migrate();
+        break;
+    case 'user:seed':
+        $console->populateUsers(count: $argv[2] ?? 0);
+        break;
+    case 'transaction:create':
+        $console->doTransaction(userId: $argv[2], amount: $argv[3] ?? 0, date:  $argv[4]);
+        break;
+    case 'user:report':
+        $console->userReport($argv[2] ?? 0);
+        break;
+    default:
+        echo "Usage: php ConsoleCommand [command] [migrate, user:seed, transaction:create]\n";
+        break;
+}
+
+class ConsoleCommand
+{
+    public function __construct(
+        public Database                 $database,
+//        protected UserRepository        $userRepository,
+//        protected TransactionRepository $transactionRepository,
+//        protected ReportService         $reportService
+    )
+    {
+    }
+
+    public function migrate(): void
+    {
+        $pdo = $this->database->getPdo();
+
+        // Discover and execute migration files
+        $migrationFiles = glob(__DIR__ . '/migrations/*.php');
+
+        foreach ($migrationFiles as $migrationFile) {
+            require_once $migrationFile;
+
+            // Use `require_once` to include the migration file
+            $migrationClassName = convertFilenameToClassName($migrationFile);
+
+            if (isset($migrationClassName)) {
+                $migration = new $migrationClassName($pdo);
+
+                if ($migration instanceof BaseMigration) {
+                    echo "Running migration: $migrationClassName\n";
+                    $migration->run();
+                } else {
+                    echo "Invalid migration class: $migrationClassName\n";
+                }
+            } else {
+                continue;
+            }
+        }
+
+
+        echo "Migrations executed successfully.\n";
+    }
+
+    public function populateUsers(int $count): void
+    {
+        $faker = Factory::create();
+        $userRepository = new UserRepository($this->database->getPdo());
+
+        for ($i = 0; $i < $count; $i++) {
+            $name = $faker->name;
+            $credit = $faker->randomFloat(2, 100, 1000);
+
+            $userRepository->createUser(new User(id: null, name: $name, credit: $credit));
+        }
+
+        echo "Users populated successfully.\n";
+    }
+
+    public function doTransaction(int $userId, float $amount, string $date): void
+    {
+        $userRepository = new UserRepository($this->database->getPdo());
+        $user = $userRepository->getById(id: $userId);
+
+        if (!isset($user)) {
+            echo "User was not found.\n";
+            return;
+        }
+
+        $transactionRepository = new TransactionRepository($this->database->getPdo());
+        $transactionRepository->createTransaction(new Transaction(userId: $userId, amount: $amount, date: $date));
+
+        echo "Transaction completed successfully.\n";
+    }
+
+    public function userReport(int $userId): void
+    {
+        $userRepository = new UserRepository($this->database->getPdo());
+        $userRepository->userReportPerDay(userId: $userId);
+    }
+
+    public function overallReport(string $date): void
+    {
+        $reportService = new ReportService($this->database->getPdo());
+        $overallReport = $reportService->getOverallReport($date);
+
+        echo "Overall Report:\n";
+        print_r($overallReport);
+    }
+}
+
+function convertFilenameToClassName($filename): ?string
+{
+    preg_match('/(\d{14})_([a-z_]+)\.php/', $filename, $matches);
+
+    if (count($matches) === 3) {
+        $migrationName = ucwords(str_replace('_', ' ', $matches[2]));
+        $className = str_replace(' ', '', $migrationName);
+        return 'Migrations\\' . $className;
+    }
+
+    return null;
+}
